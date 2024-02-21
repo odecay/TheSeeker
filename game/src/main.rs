@@ -15,9 +15,11 @@ mod cli;
 mod game;
 mod level;
 mod locale;
+
 mod screens {
     pub mod loading;
 }
+
 mod ui;
 
 #[cfg(feature = "dev")]
@@ -40,12 +42,12 @@ fn main() {
     });
     let bevy_plugins = bevy_plugins.set(ImagePlugin::default_nearest());
     #[cfg(feature = "dev")]
-    let bevy_plugins = bevy_plugins.set(bevy::log::LogPlugin {
+        let bevy_plugins = bevy_plugins.set(bevy::log::LogPlugin {
         filter: "info,wgpu_core=warn,wgpu_hal=warn,iyes_progress=trace,theseeker_game=trace,theseeker_engine=trace".into(),
         level: bevy::log::Level::TRACE,
     });
     #[cfg(not(feature = "dev"))]
-    let bevy_plugins = bevy_plugins.set(bevy::log::LogPlugin {
+        let bevy_plugins = bevy_plugins.set(bevy::log::LogPlugin {
         filter: "info,wgpu_core=warn,wgpu_hal=warn,theseeker_game=info,theseeker_engine=info"
             .into(),
         level: bevy::log::Level::INFO,
@@ -86,8 +88,8 @@ fn main() {
         crate::ui::UiPlugin,
         crate::camera::CameraPlugin,
         crate::level::LevelManagerPlugin,
-        crate::game::GameplayPlugin,
         crate::graphics::GraphicsFxPlugin,
+        crate::game::GameplayPlugin,
     ));
 
     #[cfg(feature = "dev")]

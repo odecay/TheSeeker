@@ -112,6 +112,11 @@ pub enum PlayerAction {
     Focus,
 }
 
+#[derive(Component)]
+pub struct Passives(HashSet<Passive>);
+
+pub struct Passive;
+
 fn debug_player_states(
     query: Query<
         AnyOf<(

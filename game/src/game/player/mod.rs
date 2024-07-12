@@ -112,10 +112,32 @@ pub enum PlayerAction {
     Focus,
 }
 
-#[derive(Component)]
+#[derive(Component, Deref, DerefMut)]
 pub struct Passives(HashSet<Passive>);
 
-pub struct Passive;
+impl Default for Passives {
+    fn default() -> Self {
+        Passives(HashSet::with_capacity(5))
+    }
+}
+
+impl Passives {
+    fn new_with(passive: Passive) -> Self {
+        let mut set = HashSet::with_capacity(1);
+        set.insert(passive);
+        Passives(set)
+    }
+}
+
+#[derive(Debug, Eq, PartialEq, Hash)]
+pub enum Passive {
+    Absorption,
+    CritResolve(bool),
+    Backstab,
+    CrowdCtrl,
+    Unmoving,
+    Speedy,
+}
 
 fn debug_player_states(
     query: Query<
@@ -275,6 +297,8 @@ fn setup_player(
             FocusAbility::default(),
             TransitionQueue::default(),
             StateDespawnMarker,
+            // Passives::new_with(Passive::CritResolve(true)),
+            Passives::new_with(Passive::Absorption),
         ));
         commands.entity(e_gfx).insert((PlayerGfxBundle {
             marker: PlayerGfx { e_gent },

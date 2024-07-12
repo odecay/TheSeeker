@@ -11,9 +11,12 @@ use theseeker_engine::script::ScriptPlayer;
 use super::enemy::EnemyGfx;
 use super::player::PlayerGfx;
 use super::player::{FocusAbility, FocusState};
-use crate::game::enemy::{Defense, Enemy, EnemyStateSet};
-use crate::game::player::PlayerStateSet;
+use crate::game::player::{Passive, PlayerStateSet};
 use crate::game::{attack::particles::AttackParticlesPlugin, gentstate::Dead};
+use crate::game::{
+    enemy::{Defense, Enemy, EnemyStateSet},
+    player::Passives,
+};
 use crate::prelude::*;
 use crate::{
     camera::CameraRig,
@@ -159,6 +162,8 @@ pub fn attack_damage(
         Has<Defense>,
         Has<Enemy>,
     )>,
+
+    passives: Query<&Passives, Without<Attack>>,
     mut crits: Query<(&mut Crits), Without<Attack>>,
     mut focus: Query<(&mut FocusAbility), Without<Attack>>,
     mut gfx_query: Query<Entity, Or<(With<PlayerGfx>, With<EnemyGfx>)>>,
@@ -198,14 +203,14 @@ pub fn attack_damage(
             .collect::<Vec<_>>();
         targets.sort_by(|(_, dist1), (_, dist2)| dist1.total_cmp(dist2));
         let targets_empty = targets.is_empty();
-        // Get the closest ones
-        let top_n = targets
+        // Get the closest targets
+        let valid_targets = targets
             .into_iter()
             .take(attack.max_targets as usize)
             .map(|(e, _)| e)
             .collect::<Vec<_>>();
 
-        for entity in top_n.iter() {
+        for entity in valid_targets.iter() {
             if attack.damaged_set.contains(entity) {
                 continue;
             };
@@ -217,13 +222,19 @@ pub fn attack_damage(
             };
 
             attack.damaged_set.insert(entity);
+            let p = &Passives::default();
 
+            let attacker_passives = passives.get(attack.attacker).unwrap_or(p);
+
+            //apply damage modifiers before applying damage
+            //defense modifier
             let mut damage_dealt = if is_defending {
                 attack.damage / 4
             } else {
                 attack.damage
             };
 
+            //crit multiplier
             let mut was_critical = false;
             if let Ok((mut crit)) = crits.get_mut(attack.attacker) {
                 if crit.next_hit_is_critical {
@@ -231,18 +242,20 @@ pub fn attack_damage(
                     was_critical = true;
                     println!("critical damage!")
                 }
-                if attack.new_group == true {
+                if attack.new_group {
                     crit.counter += 1;
                     println!("crit_counter: {}", crit.counter);
                 }
             }
+            //focus multiplier
             if let Ok((mut focus)) = focus.get_mut(attack.attacker) {
                 if focus.state != FocusState::InActive {
-                    damage_dealt = damage_dealt * 2;
+                    damage_dealt *= 2;
                     focus.state = FocusState::Applied
                 }
             }
 
+            //apply attack damage
             health.current = health.current.saturating_sub(damage_dealt);
             attack.damaged.push(DamageInfo {
                 entity,
@@ -250,14 +263,25 @@ pub fn attack_damage(
                 amount: damage_dealt,
                 crit: was_critical,
             });
+
+            //insert a DamageFlash to flash for 1 animation frame/8 ticks
             if let Ok(anim_entity) = gfx_query.get_mut(gent.e_gfx) {
-                //insert a DamageFlash to flash for 1 animation frame/8 ticks
                 commands.entity(anim_entity).insert(DamageFlash {
                     current_ticks: 0,
                     max_ticks: 8,
                 });
             }
+            //kill
             if health.current == 0 {
+                //heal, if heal passive is active
+                if attacker_passives.contains(&Passive::Absorption) {
+                    if let Ok((_, mut attacker_health, _, _, _, _, _)) =
+                        damageable_query.get_mut(attack.attacker)
+                    {
+                        attacker_health.current += 60;
+                    }
+                }
+
                 commands.entity(entity).insert(Dead::default());
                 //apply more screenshake if an enemies health becomes depleted by this attack
                 if is_enemy {
@@ -267,6 +291,7 @@ pub fn attack_damage(
                 //apply screenshake on damage to enemy
                 rig.trauma = 0.3
             }
+            //apply Knockback
             if let Some(pushback) = maybe_pushback {
                 commands.entity(entity).insert(Knockback::new(
                     pushback.direction,
@@ -275,7 +300,7 @@ pub fn attack_damage(
                 ));
             }
 
-            if attack.new_group == true {
+            if attack.new_group {
                 attack.new_group = false;
             }
         }
@@ -287,14 +312,14 @@ pub fn attack_damage(
             ..
         } = attack.as_mut();
         for e in collided.difference(&newly_collided) {
-            damaged_set.remove(&*e);
+            damaged_set.remove(e);
         }
         *collided = newly_collided;
         // Handle the edge case where newly collided *and* collided might not have damaged
         // set's contents
         if targets_empty {
             damaged_set.clear();
-            if attack.new_group == false {
+            if !attack.new_group {
                 attack.new_group = true;
 
                 if let Ok((mut focus)) = focus.get_mut(attack.attacker) {
@@ -310,14 +335,20 @@ pub fn attack_damage(
                     }
                 }
 
+                //determine if next hit will be critical
                 if let Ok((mut crit)) = crits.get_mut(attack.attacker) {
+                    crit.next_hit_is_critical = false;
                     let next_hit_counter = crit.counter + 1;
-                    if next_hit_counter % 17 == 0 {
+                    if next_hit_counter % 17 == 0 || next_hit_counter % 19 == 0 {
                         crit.next_hit_is_critical = true;
-                    } else if next_hit_counter % 19 == 0 {
-                        crit.next_hit_is_critical = true;
-                    } else {
-                        crit.next_hit_is_critical = false;
+                    //if the crit passive is active
+                    } else if let Ok(a_passives) = passives.get(attack.attacker) {
+                        if let Some(crit_passive) = a_passives.get(&Passive::CritResolve(true)) {
+                            println!("{:?}", crit);
+                            if next_hit_counter % 3 == 0 || next_hit_counter % 5 == 0 {
+                                crit.next_hit_is_critical = true;
+                            }
+                        }
                     }
                 }
             }

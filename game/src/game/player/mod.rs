@@ -8,6 +8,8 @@ use player_anim::PlayerAnimationPlugin;
 use player_behaviour::PlayerBehaviorPlugin;
 use rapier2d::geometry::{Group, InteractionGroups};
 use rapier2d::parry::query::TOIStatus;
+use strum::IntoEnumIterator;
+use strum_macros::EnumIter;
 use theseeker_engine::animation::SpriteAnimationBundle;
 use theseeker_engine::assets::animation::SpriteAnimation;
 use theseeker_engine::assets::config::{update_field, DynamicConfig};
@@ -112,27 +114,47 @@ pub enum PlayerAction {
     Focus,
 }
 
-#[derive(Component, Deref, DerefMut)]
-pub struct Passives(HashSet<Passive>);
+#[derive(Component, Debug, Deref, DerefMut)]
+pub struct Passives {
+    #[deref]
+    pub current: HashSet<Passive>,
+    pub locked: Vec<Passive>,
+}
 
 impl Default for Passives {
     fn default() -> Self {
-        Passives(HashSet::with_capacity(5))
+        let passives: Vec<Passive> = Passive::iter().collect();
+        Passives {
+            current: HashSet::with_capacity(5),
+            locked: passives,
+        }
     }
 }
 
 impl Passives {
+    //TODO: pass in slice of passives, filter the locked passives on it
     fn new_with(passive: Passive) -> Self {
-        let mut set = HashSet::with_capacity(1);
-        set.insert(passive);
-        Passives(set)
+        Passives::default()
+    }
+    fn gain(&mut self) {
+        //TODO: add checks for no passives remaining
+        //TODO add limit on gaining past max passive slots?
+        //does nothing if there are no more passives to gain
+        let mut rng = rand::thread_rng();
+        if !self.locked.is_empty() {
+            let i = rng.gen_range(0..self.locked.len());
+            let passive = self.locked.swap_remove(i);
+            self.current.insert(passive);
+        }
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Hash)]
+#[derive(Debug, Eq, PartialEq, Hash, EnumIter)]
 pub enum Passive {
+    /// Heal when killing an enemy
     Absorption,
-    CritResolve(bool),
+    /// Crit every 3rd and 5th hit when low health
+    CritResolve,
     Backstab,
     CrowdCtrl,
     Unmoving,
@@ -297,8 +319,9 @@ fn setup_player(
             FocusAbility::default(),
             TransitionQueue::default(),
             StateDespawnMarker,
+            Passives::default(),
             // Passives::new_with(Passive::CritResolve(true)),
-            Passives::new_with(Passive::Absorption),
+            // Passives::new_with(Passive::Absorption),
         ));
         commands.entity(e_gfx).insert((PlayerGfxBundle {
             marker: PlayerGfx { e_gent },
@@ -569,6 +592,9 @@ pub struct PlayerConfig {
 
     /// Spends this much energy per second when not using whirl
     whirl_regen: f32,
+
+    /// How many kills to trigger a passive gain
+    passive_gain_rate: u32,
 }
 
 fn load_player_config(
@@ -632,6 +658,7 @@ fn update_player_config(config: &mut PlayerConfig, cfg: &DynamicConfig) {
     update_field(&mut errors, &cfg.0, "max_whirl_energy", |val| config.max_whirl_energy = val);
     update_field(&mut errors, &cfg.0, "whirl_cost", |val| config.whirl_cost = val);
     update_field(&mut errors, &cfg.0, "whirl_regen", |val| config.whirl_regen = val);
+    update_field(&mut errors, &cfg.0, "passive_gain_rate", |val| config.passive_gain_rate = val as u32);
 
    for error in errors{
        warn!("failed to load player cfg value: {}", error);

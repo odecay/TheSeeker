@@ -11,7 +11,7 @@ use crate::prelude::{
     any_with_component, App, BuildChildren, Commands, DetectChanges, Direction2d, Entity,
     IntoSystemConfigs, Plugin, Query, Res, ResMut, Transform, TransformBundle, With, Without,
 };
-use bevy::prelude::Has;
+use bevy::prelude::{resource_changed, Has};
 
 use bevy::transform::TransformSystem::TransformPropagate;
 use glam::{Vec2, Vec2Swizzles, Vec3Swizzles};
@@ -27,6 +27,8 @@ use theseeker_engine::physics::{
 use theseeker_engine::prelude::{GameTickUpdate, GameTime};
 use theseeker_engine::script::ScriptPlayer;
 
+use super::{KillCount, Passives};
+
 ///Player behavior systems.
 ///Do stuff here in states and add transitions to other states by pushing
 ///to a TransitionQueue.
@@ -37,6 +39,7 @@ impl Plugin for PlayerBehaviorPlugin {
         app.add_systems(
             GameTickUpdate,
             (
+                (gain_passives.run_if(resource_changed::<KillCount>)),
                 (
                     player_idle.run_if(any_with_component::<Idle>),
                     add_attack,
@@ -69,6 +72,19 @@ impl Plugin for PlayerBehaviorPlugin {
             )
                 .chain(),
         );
+    }
+}
+
+fn gain_passives(
+    mut query: Query<(&mut Passives), With<Player>>,
+    kills: Res<KillCount>,
+    player_config: Res<PlayerConfig>,
+) {
+    for mut passives in query.iter_mut() {
+        if **kills % player_config.passive_gain_rate == 0 {
+            passives.gain();
+            println!("{:?}", passives);
+        }
     }
 }
 

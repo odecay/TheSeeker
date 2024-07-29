@@ -56,3 +56,6 @@ whirl_cost = 2.0
 
 # Spends this much energy per second when not using whirl
 whirl_regen = 0.7
+
+# Number of kills to trigger passive gain
+passive_gain_rate = 3.0

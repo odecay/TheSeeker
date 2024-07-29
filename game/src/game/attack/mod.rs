@@ -343,10 +343,17 @@ pub fn attack_damage(
                         crit.next_hit_is_critical = true;
                     //if the crit passive is active
                     } else if let Ok(a_passives) = passives.get(attack.attacker) {
-                        if let Some(crit_passive) = a_passives.get(&Passive::CritResolve(true)) {
+                        if let Some(crit_passive) = a_passives.get(&Passive::CritResolve) {
                             println!("{:?}", crit);
-                            if next_hit_counter % 3 == 0 || next_hit_counter % 5 == 0 {
-                                crit.next_hit_is_critical = true;
+                            if let Ok((_, mut attacker_health, _, _, _, _, _)) =
+                                damageable_query.get_mut(attack.attacker)
+                            {
+                                if attacker_health.current as f32
+                                    <= attacker_health.max as f32 * 0.2
+                                    && (next_hit_counter % 3 == 0 || next_hit_counter % 5 == 0)
+                                {
+                                    crit.next_hit_is_critical = true;
+                                }
                             }
                         }
                     }

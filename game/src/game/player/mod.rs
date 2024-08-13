@@ -436,6 +436,18 @@ impl Transitionable<Attacking> for CanAttack {
 
 #[derive(Component, Debug, Default)]
 #[component(storage = "SparseSet")]
+pub struct Whirling {
+    pub attack_entity: Option<Entity>,
+    pub ticks: u32,
+}
+impl GentState for Whirling {}
+
+impl Transitionable<CanAttack> for Whirling {
+    type Removals = (Whirling, Attacking);
+}
+
+#[derive(Component, Debug, Default)]
+#[component(storage = "SparseSet")]
 pub struct Dashing {
     duration: f32,
 }
@@ -494,6 +506,7 @@ impl WallSlideTime {
     }
 }
 
+//TODO: remove, migrate anything necessary to the Whirling state
 #[derive(Component, Default, Debug)]
 pub struct WhirlAbility {
     active: bool,

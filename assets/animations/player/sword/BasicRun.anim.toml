@@ -6,6 +6,12 @@ frame_min = 1
 frame_max = 20
 frame_start = 1
 
+[[script]]
+run_on_playback_control = "Start"
+if_previous_script_key = "anim.player.SwordBasicIdle"
+action = "SetSpriteColor"
+color = "#ff0000"
+
 # VARIANT 1 INIT
 [[script]]
 run_on_playback_control = "Start"

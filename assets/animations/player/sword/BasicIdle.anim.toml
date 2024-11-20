@@ -11,6 +11,12 @@ run_at_frame = [2, 7, 12]
 action = "PlayAudio"
 asset_key = "audio.game.HammerImpact"
 
+[[script]]
+run_on_playback_control = "Start"
+if_previous_script_key = "anim.player.SwordBasicRun"
+action = "SetSpriteColor"
+color = "#ff0000"
+
 # VARIANT 1 INIT
 [[script]]
 run_on_playback_control = "Start"
